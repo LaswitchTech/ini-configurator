@@ -8,7 +8,7 @@
 ![Version](https://img.shields.io/github/v/release/LaswitchTech/ini-configurator?label=Version&style=for-the-badge)
 
 ## Description
-INI Configurator is a lightweight and user-friendly GUI application designed for configuring my.ini files. The application allows users to seamlessly edit and manage configuration settings with a collapsible section-based interface, ensuring clarity and simplicity even with complex configuration files. The source code may be used to build similar applications for other configuration files.
+INI Configurator is a lightweight and user-friendly GUI application designed for configuring ``.ini`` files. The application allows users to seamlessly edit and manage configuration settings with a collapsible section-based interface, ensuring clarity and simplicity even with complex configuration files. The source code may be used to build similar applications for other configuration files.
 
 ## Features
   - **Dynamic Configuration Editor**: Load, edit, and save my.ini configurations directly through the GUI.

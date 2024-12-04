@@ -113,6 +113,7 @@ class Configurator(QMainWindow):
         self.main_layout = QVBoxLayout(self.main_widget)
         self.main_layout.setObjectName("mainLayout")
         self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(0)
         self.setCentralWidget(self.main_widget)
 
         # Add a scroll area
@@ -122,6 +123,7 @@ class Configurator(QMainWindow):
         self.scroll_layout = QVBoxLayout(self.scroll_content)
         self.scroll_layout.setObjectName("scrollLayout")
         self.scroll_layout.setContentsMargins(0, 0, 0, 0)
+        self.scroll_layout.setSpacing(0)
         self.scroll_area.setWidget(self.scroll_content)
         self.main_layout.addWidget(self.scroll_area)
 
@@ -335,8 +337,10 @@ class Configurator(QMainWindow):
         section_container.setContentsMargins(0, 0, 0, 0)
         section_layout = QVBoxLayout()
         section_layout.setContentsMargins(0, 0, 0, 0)
-        section_layout.setSpacing(0)  # Reduce padding between fields
+        section_layout.setSpacing(0)
+        section_layout.setObjectName("sectionLayout")
         section_container.setLayout(section_layout)
+        section_container.setObjectName("sectionContainerLayout")
 
         # Add to scroll layout
         self.scroll_layout.addWidget(section_title)
@@ -489,6 +493,7 @@ class Configurator(QMainWindow):
         container = QWidget()
         container.setLayout(row_layout)
         container.setToolTip(parameters["tooltip"])
+        container.setObjectName("rowContainerLayout")
 
         # Add a label
         label_layout = QHBoxLayout()

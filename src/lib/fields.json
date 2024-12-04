@@ -1,0 +1,135 @@
+{
+    "fields": {
+        "static": {
+            "label": "Static",
+            "tooltip": "This is a static field",
+            "type": "static",
+            "default": "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.",
+            "required": true
+        },
+        "text": {
+            "label": "Text",
+            "tooltip": "This is a text field",
+            "type": "text",
+            "default": "My default value",
+            "required": true
+        },
+        "password": {
+            "label": "Password",
+            "tooltip": "This is a password field",
+            "type": "password",
+            "default": "MyPassword",
+            "required": true
+        },
+        "number": {
+            "label": "Number",
+            "tooltip": "This is a number field",
+            "type": "number",
+            "default": 1234,
+            "options": {
+                "min": 0,
+                "max": 2000
+            },
+            "required": true
+        },
+        "raw": {
+            "label": "Raw",
+            "tooltip": "This is a raw field",
+            "type": "raw",
+            "default": "string",
+            "required": false
+        },
+        "checkbox": {
+            "label": "Checkbox",
+            "tooltip": "This is a checkbox field",
+            "type": "checkbox",
+            "default": false,
+            "required": true
+        },
+        "path": {
+            "label": "Path",
+            "tooltip": "This is a path field",
+            "type": "path",
+            "default": "path/",
+            "required": true
+        },
+        "select": {
+            "label": "Select",
+            "tooltip": "This is a select field",
+            "type": "select",
+            "default": "Option 2",
+            "options": [
+                "Option 1",
+                "Option 2",
+                "Option 3"
+            ],
+            "required": true
+        },
+        "multi-select": {
+            "label": "Multi-Select",
+            "tooltip": "This is a multi-select field",
+            "type": "multi-select",
+            "default": "Option 1,Option 3",
+            "options": [
+                "Option 1",
+                "Option 2",
+                "Option 3"
+            ],
+            "required": true
+        },
+        "range": {
+            "label": "Range",
+            "tooltip": "This is a range field",
+            "type": "range",
+            "default": 50,
+            "options": {
+                "min": 0,
+                "max": 100
+            },
+            "required": true
+        },
+        "filesize": {
+            "label": "FileSize",
+            "tooltip": "This is a filesize field",
+            "type": "filesize",
+            "default": 67108864,
+            "options": {
+                "min": 1048576,
+                "max": 134217728
+            },
+            "required": true
+        }
+    },
+    "variables": {
+        "totalram": {
+            "label": "TotalRAM",
+            "tooltip": "This will be replaced with the total RAM in bytes of the system. Variables must be in the format %VariableName%",
+            "type": "text",
+            "default": "%TotalRAM%",
+            "required": true
+        },
+        "appdir": {
+            "label": "AppDir",
+            "tooltip": "This will be replaced by the application directory. Variables must be in the format %VariableName%",
+            "type": "text",
+            "default": "%AppDir%",
+            "required": true
+        }
+    },
+    "required": {
+        "required": {
+            "label": "Required",
+            "tooltip": "This checkbox is required",
+            "type": "checkbox",
+            "default": false,
+            "required": true
+        },
+        "notrequired": {
+            "label": "Not Required",
+            "tooltip": "This checkbox is not required",
+            "type": "checkbox",
+            "default": false,
+            "required": false
+        }
+    }
+}

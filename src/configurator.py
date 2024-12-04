@@ -44,16 +44,16 @@ class Configurator(QMainWindow):
             # If the application is frozen (e.g., running as .app or .exe)
             if sys.platform == "darwin":
                 # For macOS, locate the directory containing the .app bundle
-                self.script_directory = os.path.abspath(
-                    os.path.join(os.path.dirname(sys.executable), '..', '..', '..')
-                )
+                self.script_directory = os.path.abspath(os.path.join(os.path.dirname(sys.executable), '..', '..', '..'))
+                self.resource_directory = os.path.abspath(os.path.join(sys.executable, "..", "..", "Resources"))
+            elif sys.platform == "win32":
+                # For Windows, locate the directory containing the .exe file
+                self.script_directory = os.path.abspath(os.path.dirname(sys.executable))
+                self.resource_directory = os.path.abspath(os.path.join(sys.executable, "Resources"))
             else:
                 # For other platforms, use the executable's directory
                 self.script_directory = os.path.dirname(sys.executable)
-            # If the application is frozen (e.g., running as .app or .exe)
-            self.resource_directory = os.path.abspath(
-                os.path.join(os.path.dirname(sys.executable), "..", "Resources")
-            )
+                self.resource_directory = self.script_directory
         else:
             # If running as a regular script
             self.script_directory = os.path.dirname(os.path.abspath(__file__))

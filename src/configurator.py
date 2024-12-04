@@ -45,11 +45,11 @@ class Configurator(QMainWindow):
             if sys.platform == "darwin":
                 # For macOS, locate the directory containing the .app bundle
                 self.script_directory = os.path.abspath(os.path.join(os.path.dirname(sys.executable), '..', '..', '..'))
-                self.resource_directory = os.path.abspath(os.path.join(sys.executable, "..", "..", "Resources"))
+                self.resource_directory = os.path.abspath(os.path.join(os.path.dirname(sys.executable), "..", "..", "Resources"))
             elif sys.platform == "win32":
                 # For Windows, locate the directory containing the .exe file
                 self.script_directory = os.path.abspath(os.path.dirname(sys.executable))
-                self.resource_directory = os.path.abspath(os.path.join(sys.executable, "Resources"))
+                self.resource_directory = os.path.abspath(os.path.dirname(sys._MEIPASS))
             else:
                 # For other platforms, use the executable's directory
                 self.script_directory = os.path.dirname(sys.executable)

@@ -45,7 +45,7 @@ class Configurator(QMainWindow):
             if sys.platform == "darwin":
                 # For macOS, locate the directory containing the .app bundle
                 self.script_directory = os.path.abspath(os.path.join(os.path.dirname(sys.executable), '..', '..', '..'))
-                self.resource_directory = os.path.abspath(os.path.join(os.path.dirname(sys.executable), "..", "..", "Resources"))
+                self.resource_directory = os.path.abspath(os.path.join(os.path.dirname(sys.executable), "..", "Resources"))
             elif sys.platform == "win32":
                 # For Windows, locate the directory containing the .exe file
                 self.script_directory = os.path.abspath(os.path.dirname(sys.executable))
@@ -80,6 +80,14 @@ class Configurator(QMainWindow):
         # Initialize the form
         self.init_form()
 
+    def load_stylesheet(self, stylesheet_path, resource_directory):
+        with open(stylesheet_path, "r") as f:
+            stylesheet = f.read()
+
+        # Replace relative image paths with absolute paths
+        stylesheet = stylesheet.replace("src/", f"{resource_directory}/")
+        return stylesheet
+
     def init_ui(self):
 
         # Debugging
@@ -92,9 +100,13 @@ class Configurator(QMainWindow):
         self.resize(800, 600)
         self.setObjectName("mainWindow")
 
-        # Load Style Sheets
-        with open(os.path.join(os.path.join(self.resource_directory, "styles/style.css"))) as f:
-            self.setStyleSheet(f.read())
+        # Determine the paths based on whether the app is frozen
+        stylesheet_path = os.path.join(self.resource_directory, "styles/style.css")
+
+        # Load and set the stylesheet
+        if os.path.exists(stylesheet_path):
+            stylesheet = self.load_stylesheet(stylesheet_path, self.resource_directory)
+            self.setStyleSheet(stylesheet)
 
         # Main widget and layout
         self.main_widget = QWidget()

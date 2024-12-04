@@ -47,7 +47,7 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin https://<GH_PAT>@github.com/LaswitchTech/ini-configurator.git
+          git remote set-url origin https://${{ secrets.GH_PAT }}@github.com/LaswitchTech/ini-configurator.git
           git add dist/windows/Configurator.exe
           git commit -m "configurator.py: Build executable Configurator.exe"
           git push

@@ -48,7 +48,7 @@ python -m pip install --upgrade pip
 
 # Ensure the necessary packages are installed
 log "Installing required packages..."
-pip install pyinstaller sip importlib PySide6-Addons psutil
+pip install pyinstaller sip importlib PySide6-Addons psutil chardet
 pip install pyqt5 --config-settings --confirm-license= --verbose
 
 # Check if the .spec file exists

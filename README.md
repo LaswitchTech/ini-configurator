@@ -1,6 +1,6 @@
 <p align="center"><img src="src/icons/icon.png" /></p>
 
-#  MySQL INI Configurator
+#  INI Configurator
 ![License](https://img.shields.io/github/license/LaswitchTech/ini-configurator?style=for-the-badge)
 ![GitHub repo size](https://img.shields.io/github/repo-size/LaswitchTech/ini-configurator?style=for-the-badge&logo=github)
 ![GitHub top language](https://img.shields.io/github/languages/top/LaswitchTech/ini-configurator?style=for-the-badge)

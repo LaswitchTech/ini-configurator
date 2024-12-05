@@ -648,7 +648,7 @@ class Configurator(QMainWindow):
 
             # Connect buttons
             browse_button.clicked.connect(lambda: self.browse_path(line_edit))
-            default_button.clicked.connect(lambda: line_edit.setText(default_path))
+            default_button.clicked.connect(lambda: line_edit.setText(self.parse_variables(default_path)))
 
             # Add widgets to the path layout
             path_layout.addWidget(line_edit)

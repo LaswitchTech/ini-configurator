@@ -692,21 +692,21 @@ class Configurator(QMainWindow):
             input_layout.setContentsMargins(0, 0, 0, 0)
         elif parameters["type"] == "path":
             # Handle path inputs
-            default_path = os.path.abspath(os.path.join(self.script_directory, parameters["default"])) if parameters["default"] else ""
-            value = self.parse_variables(value) or default_path
+            default_path = os.path.abspath(self.parse_variables(parameters["default"])) if parameters["default"] else ""
+            value = os.path.abspath(self.parse_variables(value) or default_path)
 
             # Create the layout and widgets for the path field
             path_layout = QHBoxLayout()
             path_layout.setContentsMargins(0, 0, 0, 0)
             line_edit = QLineEdit()
             line_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            line_edit.setText(os.path.abspath(value))
+            line_edit.setText(value)
             browse_button = QPushButton("...")
             default_button = QPushButton("Set Default")
 
             # Connect buttons
             browse_button.clicked.connect(lambda: self.browse_path(line_edit))
-            default_button.clicked.connect(lambda: line_edit.setText(os.path.abspath(self.parse_variables(default_path))))
+            default_button.clicked.connect(lambda: line_edit.setText(default_path))
 
             # Add widgets to the path layout
             path_layout.addWidget(line_edit)

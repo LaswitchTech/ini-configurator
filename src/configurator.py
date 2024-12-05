@@ -18,6 +18,7 @@ from configparser import ConfigParser
 # Declare Constants
 APP_NAME = "INI Configurator"
 INI_FILE = "conf.ini"
+ENCODING = "utf-8"
 DEBUG = False
 
 class CaseSensitiveConfigParser(ConfigParser):
@@ -228,7 +229,7 @@ class Configurator(QMainWindow):
         if os.path.exists(self.ini_path):
 
             # Read the configuration file
-            Parser.read(self.ini_path)
+            Parser.read(self.ini_path, encoding=ENCODING)
 
             # Get raw lines to check for raw values
             raw_lines = Parser.get_raw_lines()
@@ -786,7 +787,6 @@ class Configurator(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-
     window = Configurator(INI_FILE, APP_NAME)
     window.show()
     sys.exit(app.exec_())

@@ -2,6 +2,7 @@
 import sys
 import os
 import psutil
+import chardet
 import json
 from PyQt5.QtCore import Qt
 from PyQt5 import QtGui
@@ -18,27 +19,70 @@ from configparser import ConfigParser
 # Declare Constants
 APP_NAME = "INI Configurator"
 INI_FILE = "conf.ini"
-ENCODING = "utf-8"
+LOG_FILE = "log.log"
+ENCODING = "mbcs" if sys.platform == "win32" else "utf-8"
 DEBUG = False
 
 class CaseSensitiveConfigParser(ConfigParser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.raw_lines = []  # Store raw lines from the file
+        self.detected_encoding = ENCODING  # Default encoding
 
     def read(self, filenames, encoding=None):
         """Read the configuration file and preserve raw lines."""
-        with open(filenames, 'r', encoding=encoding or 'utf-8') as f:
+        with open(filenames, 'rb') as binary_file:
+            raw_data = binary_file.read()
+            detected = chardet.detect(raw_data)
+            self.detected_encoding = detected['encoding'] or ENCODING
+
+        # Use detected encoding or specified encoding
+        final_encoding = encoding or self.detected_encoding
+        with open(filenames, 'r', encoding=final_encoding) as f:
             self.raw_lines = f.readlines()  # Store raw lines
-        super().read(filenames, encoding=encoding)
+        super().read_string(''.join(self.raw_lines), source=filenames)
 
     def get_raw_lines(self):
         """Return raw lines from the file."""
         return self.raw_lines
 
+    def get_encoding(self):
+        """Return detected encoding."""
+        return self.detected_encoding
+
 class Configurator(QMainWindow):
-    def __init__(self, ini_path, window_title="INI Configurator"):
+
+    ############################################################################
+    #
+    # Constructor
+    #
+    ############################################################################
+
+    def __init__(self, ini_path):
         super().__init__()
+
+        # Initialize the fields
+        self.init_app(ini_path)
+
+        # Initialize the fields
+        self.init_fields()
+
+        # Initialize the configurations
+        self.init_config()
+
+        # Initialize the UI
+        self.init_ui()
+
+        # Initialize the form
+        self.init_form()
+
+    ############################################################################
+    #
+    # Initialization Methods
+    #
+    ############################################################################
+
+    def init_app(self, ini_path):
 
         # Dynamically determine the path to my.ini in the same directory as this script
         if getattr(sys, 'frozen', False):
@@ -61,39 +105,154 @@ class Configurator(QMainWindow):
             self.resource_directory = os.path.join(self.script_directory)
 
         # Debugging
-        if DEBUG:
-            print("Script Directory:", self.script_directory)
-            print("Resource Directory:", self.resource_directory)
+        self.log("Script Directory:", self.script_directory)
+        self.log("Resource Directory:", self.resource_directory)
 
         # Application settings
         self.ini_path = os.path.join(self.script_directory, ini_path)
-        self.window_title = window_title
+        self.window_title = APP_NAME
+        self.encoding = ENCODING
 
-        # Initialize the UI
-        self.init_ui()
+        # Debugging
+        self.log("INI Path:", self.ini_path)
+        self.log("Application Name:", self.window_title)
+        self.log("Default Encoding:", self.encoding)
+        self.log("Application initialized.")
 
-        # Initialize the fields
-        self.init_fields()
+    def init_fields(self):
 
-        # Initialize the configurations
-        self.init_config()
+        # Debugging
+        self.log("Initializing Fields...")
 
-        # Initialize the form
-        self.init_form()
+        # Fields dictionary
+        self.fields = {}
 
-    def load_stylesheet(self, stylesheet_path, resource_directory):
-        with open(stylesheet_path, "r") as f:
-            stylesheet = f.read()
+        # Set filename
+        filename = os.path.join(self.resource_directory, "lib/fields.json")
 
-        # Replace relative image paths with absolute paths
-        stylesheet = stylesheet.replace("src/", f"{resource_directory}/")
-        return stylesheet
+        # Load the field listing from src/fields.json if it exists
+        if os.path.exists(filename):
+
+            with open(filename, 'rb') as binary_file:
+                raw_data = binary_file.read()
+                detected = chardet.detect(raw_data)['encoding']
+
+            # Load fields from JSON file
+            with open(filename, "r", encoding=detected) as f:
+
+                # Loop through each section and field
+                for section, fields in json.load(f).items():
+                    for key, parameters in fields.items():
+
+                        # Debugging
+                        self.log(f"Field: {section} -> {key}")
+
+                        # Add the field to the dictionary
+                        self.add_fields(
+                            section,
+                            key,
+                            parameters["label"],
+                            parameters["tooltip"],
+                            parameters["type"],
+                            parameters["default"],
+                            parameters["required"],
+                            parameters.get("options", [])
+                        )
+
+        # Debugging
+        self.log("Fields initialized.")
+
+    def init_config(self):
+
+        # Debugging
+        self.log("Initializing Configurations...")
+
+        # Initialize the configuration dictionary
+        self.config = {}
+
+        # Load default configuration from fields
+        for section, fields in self.fields.items():
+
+            # Create the section if it doesn't exist
+            if section not in self.config:
+                self.config[section] = {}
+
+            # Add the field to the section
+            for key, parameters in fields.items():
+
+                # Debugging
+                self.log(f"Configuring: {section} -> {key}")
+
+                self.config[section][key] = parameters["default"]
+
+        # Initialize the Parser
+        Parser = CaseSensitiveConfigParser(allow_no_value=True)
+
+        # Load configuration from the INI file
+        if os.path.exists(self.ini_path):
+
+            # Read the configuration file
+            Parser.read(self.ini_path, encoding=self.encoding)
+
+            # Use the encoding detected when reading the file
+            if isinstance(Parser, CaseSensitiveConfigParser):
+                self.encoding = Parser.get_encoding()
+
+            # Debugging
+            self.log("Encoding:", self.encoding)
+
+            # Get raw lines to check for raw values
+            raw_lines = Parser.get_raw_lines()
+
+            # Debugging
+            self.log("Reading configuration from INI file...")
+            self.log("Raw Lines:", raw_lines)
+
+            # Create a dictionary to map sections to their lines
+            section_lines = {}
+            current_section = None
+
+            for line in raw_lines:
+                stripped_line = line.strip()
+                if stripped_line.startswith("[") and stripped_line.endswith("]"):
+                    # This is a section header
+                    current_section = stripped_line[1:-1].strip()  # Extract section name
+                    section_lines[current_section] = []
+                elif current_section is not None:
+                    # Add line to the current section
+                    section_lines[current_section].append(line)
+
+            # Debugging
+            self.log("Section Lines:", section_lines)
+
+            # Overwrite default values with existing configuration
+            for section, fields in self.fields.items():
+                for key, parameters in fields.items():
+                    if parameters["type"] == "raw":
+                        self.config[section][key] = "False"
+                        raw_string = parameters["default"]
+                        if raw_string[-1] != "\n":
+                            raw_string += "\n"
+                        # Debugging
+                        self.log(f"Raw String: {raw_string}")
+                        if section in section_lines and raw_string in section_lines[section]:
+                            self.config[section][key] = "True"
+                    elif section in Parser and key in Parser[section]:
+                        self.config[section][key] = Parser[section][key]
+
+        # Debugging
+        if DEBUG:
+            self.log("Sections found:", Parser.sections())
+            for section, fields in self.config.items():
+                self.log(f"Section: {section}")
+                for key, value in fields.items():
+                    self.log(f"  {key} = {value}")
+        self.log("Configurations initialized.")
 
     def init_ui(self):
 
         # Debugging
-        if DEBUG:
-            print("Initializing UI...")
+        self.log("Initializing UI...")
 
         # Main window settings
         self.setWindowTitle(self.window_title)
@@ -135,47 +294,175 @@ class Configurator(QMainWindow):
         self.main_layout.addWidget(self.save_button)
 
         # Debugging
-        if DEBUG:
-            print("UI initialized.")
+        self.log("UI initialized.")
 
-    def init_fields(self):
-
-        # Debugging
-        if DEBUG:
-            print("Initializing Fields...")
-
-        # Fields dictionary
-        self.fields = {}
-
-        # Load the field listing from src/fields.json if it exists
-        if os.path.exists(os.path.join(self.resource_directory, "lib/fields.json")):
-
-            # Load fields from JSON file
-            with open(os.path.join(self.resource_directory, "lib/fields.json"), "r") as f:
-
-                # Loop through each section and field
-                for section, fields in json.load(f).items():
-                    for key, parameters in fields.items():
-
-                        # Debugging
-                        if DEBUG:
-                            print(f"Field: {section} -> {key}")
-
-                        # Add the field to the dictionary
-                        self.add_fields(
-                            section,
-                            key,
-                            parameters["label"],
-                            parameters["tooltip"],
-                            parameters["type"],
-                            parameters["default"],
-                            parameters["required"],
-                            parameters.get("options", [])
-                        )
+    def init_form(self):
 
         # Debugging
-        if DEBUG:
-            print("Fields initialized.")
+        self.log("Initializing Form...")
+
+        # Initialize the objs dictionary
+        self.objs = {}
+
+        # Add sections and fields to the form
+        for section, fields in self.fields.items():
+
+            # Add the section to the objs dictionary
+            self.objs[section] = {}
+
+            # Add the section to the form
+            layout = self.add_section(section)
+
+            # Add the fields to the layout
+            for key, parameters in fields.items():
+                self.add_input(layout, section, key, parameters)
+
+        # Debugging
+        self.log("Form initialized.")
+
+    ############################################################################
+    #
+    # Helper Methods
+    #
+    ############################################################################
+
+    def load_stylesheet(self, stylesheet_path, resource_directory):
+        with open(stylesheet_path, "r") as f:
+            stylesheet = f.read()
+
+        # Replace relative image paths with absolute paths
+        stylesheet = stylesheet.replace("src/", f"{resource_directory}/")
+        return stylesheet
+
+    def toggle_section(self, section_container, chevron):
+        is_visible = section_container.isVisible()
+        section_container.setVisible(not is_visible)
+        chevron.setText("▼" if is_visible else "▲")
+
+    def parse_variables(self, value):
+
+        # Debugging
+        self.log(f"Parsing variables in [{value}]...")
+
+        # Check the variable type
+        if isinstance(value, bool):
+            value = "1" if value else "0"
+        elif not isinstance(value, str):
+            value = str(value)
+
+        # Replace %AppDir% with the directory of the INI file
+        if "%AppDir%" in value:
+            value = value.replace("%AppDir%", self.script_directory)
+
+        # Replace %TotalRAM% with the total RAM in bytes
+        if "%TotalRAM%" in value:
+            value = str(value).replace("%TotalRAM%", str(psutil.virtual_memory().total))
+
+        # Remove Quotes and Double Quotes
+        value = value.replace('"', "").replace("'", "")
+
+        # Remove leading and trailing whitespace
+        value = value.strip()
+
+        # Debugging
+        self.log(f"Value parsed: [{value}]")
+
+        return value
+
+    def convert_encoding(self, text):
+        # Detect the encoding of the text
+        encoding = chardet.detect(text)["encoding"]
+        # Convert the text to self.encoding
+        return text.decode(encoding, errors='ignore').encode(self.encoding)
+
+    def convert_to_string(self, array):
+
+        # loop through the array and convert each item to a string
+        for i in range(len(array)):
+            array[i] = str(array[i])
+
+        return array
+
+    def convert_to_bytes(self, size):
+
+        # Debugging
+        self.log(f"Parsing size [{size}]...")
+
+        # Check if the size is a string
+        if isinstance(size, str):
+
+            # Check if the size ends with a unit
+            if size[-1].isalpha():
+
+                # Get the unit and value
+                unit = size[-1].lower()
+                value = int(size[:-1])
+
+                # Convert the value to bytes
+                if unit == "t":
+                    return value * 1024**4
+                elif unit == "g":
+                    return value * 1024**3
+                elif unit == "m":
+                    return value * 1024**2
+                elif unit == "k":
+                    return value * 1024
+                elif unit == "b":
+                    return value
+
+        return int(size)
+
+    def convert_to_human_readable(self, size):
+
+        # Debugging
+        self.log(f"Parsing size [{size}]...")
+
+        # Convert the size to a human-readable format
+        if size >= 1024**4:
+            return f"{size / 1024**4:.2f} TB"
+        elif size >= 1024**3:
+            return f"{size / 1024**3:.2f} GB"
+        elif size >= 1024**2:
+            return f"{size / 1024**2:.2f} MB"
+        elif size >= 1024:
+            return f"{size / 1024:.2f} KB"
+
+        return f"{size} B"
+
+    def convert_to_ini(self, size):
+
+        # Debugging
+        self.log(f"Parsing size [{size}]...")
+
+        # Convert the size to a human-readable format and remove decimals
+        if size >= 1024**4:
+            return f"{size // 1024**4}T"
+        elif size >= 1024**3:
+            return f"{size // 1024**3}G"
+        elif size >= 1024**2:
+            return f"{size // 1024**2}M"
+        elif size >= 1024:
+            return f"{size // 1024}B"
+
+        return f"{size}B"
+
+    def get_array_key(self, array, key):
+        if isinstance(array, list):
+            for item in array:
+                if isinstance(item, dict) and key in item:
+                    return item[key]
+        return None
+
+    def browse_path(self, line_edit):
+        path = QFileDialog.getExistingDirectory(self, "Select Directory", self.script_directory)
+        if path:
+            line_edit.setText(path)
+
+    ############################################################################
+    #
+    # Data Methods
+    #
+    ############################################################################
 
     def add_fields(self, section, key, label, tooltip, type, default=None, required=True, options=[]):
 
@@ -194,125 +481,18 @@ class Configurator(QMainWindow):
         }
 
         # Debugging
-        if DEBUG:
-            print(f"Field added: {section} -> {key}")
+        self.log(f"Field added: {section} -> {key}")
 
-    def init_config(self):
-
-        # Debugging
-        if DEBUG:
-            print("Initializing Configurations...")
-
-        # Initialize the configuration dictionary
-        self.config = {}
-
-        # Load default configuration from fields
-        for section, fields in self.fields.items():
-
-            # Create the section if it doesn't exist
-            if section not in self.config:
-                self.config[section] = {}
-
-            # Add the field to the section
-            for key, parameters in fields.items():
-
-                # Debugging
-                if DEBUG:
-                    print(f"Configuring: {section} -> {key}")
-
-                self.config[section][key] = parameters["default"]
-
-        # Initialize the Parser
-        Parser = CaseSensitiveConfigParser(allow_no_value=True)
-
-        # Load configuration from the INI file
-        if os.path.exists(self.ini_path):
-
-            # Read the configuration file
-            Parser.read(self.ini_path, encoding=ENCODING)
-
-            # Get raw lines to check for raw values
-            raw_lines = Parser.get_raw_lines()
-
-            # Debugging
-            if DEBUG:
-                print("Reading configuration from INI file...")
-                print("Raw Lines:", raw_lines)
-
-            # Create a dictionary to map sections to their lines
-            section_lines = {}
-            current_section = None
-
-            for line in raw_lines:
-                stripped_line = line.strip()
-                if stripped_line.startswith("[") and stripped_line.endswith("]"):
-                    # This is a section header
-                    current_section = stripped_line[1:-1].strip()  # Extract section name
-                    section_lines[current_section] = []
-                elif current_section is not None:
-                    # Add line to the current section
-                    section_lines[current_section].append(line)
-
-            # Debugging
-            if DEBUG:
-                print("Section Lines:", section_lines)
-
-            # Overwrite default values with existing configuration
-            for section, fields in self.fields.items():
-                for key, parameters in fields.items():
-                    if parameters["type"] == "raw":
-                        self.config[section][key] = "False"
-                        raw_string = parameters["default"]
-                        if raw_string[-1] != "\n":
-                            raw_string += "\n"
-                        # Debugging
-                        if DEBUG:
-                            print(f"Raw String: {raw_string}")
-                        if section in section_lines and raw_string in section_lines[section]:
-                            self.config[section][key] = "True"
-                    elif section in Parser and key in Parser[section]:
-                        self.config[section][key] = Parser[section][key]
-
-        # Debugging
-        if DEBUG:
-            print("Sections found:", Parser.sections())
-            for section, fields in self.config.items():
-                print(f"Section: {section}")
-                for key, value in fields.items():
-                    print(f"  {key} = {value}")
-            print("Configurations initialized.")
-
-    def init_form(self):
-
-        # Debugging
-        if DEBUG:
-            print("Initializing Form...")
-
-        # Initialize the objects dictionary
-        self.objects = {}
-
-        # Add sections and fields to the form
-        for section, fields in self.fields.items():
-
-            # Add the section to the objects dictionary
-            self.objects[section] = {}
-
-            # Add the section to the form
-            layout = self.add_section(section)
-
-            # Add the fields to the layout
-            for key, parameters in fields.items():
-                self.add_input(layout, section, key, parameters)
-
-        # Debugging
-        if DEBUG:
-            print("Form initialized.")
+    ############################################################################
+    #
+    # Form Methods
+    #
+    ############################################################################
 
     def add_section(self, section):
 
         # Debugging
-        if DEBUG:
-            print("Initializing Section[{section}]...")
+        self.log("Initializing Section[{section}]...")
 
         # Section title with chevron
         section_title = QWidget()
@@ -352,135 +532,15 @@ class Configurator(QMainWindow):
         section_title.mousePressEvent = lambda event: self.toggle_section(section_container, chevron)
 
         # Debugging
-        if DEBUG:
-            print(f"Section[{section}] initialized.")
+        self.log(f"Section[{section}] initialized.")
 
         # Return the section layout
         return section_layout
 
-    def toggle_section(self, section_container, chevron):
-        is_visible = section_container.isVisible()
-        section_container.setVisible(not is_visible)
-        chevron.setText("▼" if is_visible else "▲")
-
-    def parse_variables(self, value):
-
-        # Debugging
-        if DEBUG:
-            print(f"Parsing variables in [{value}]...")
-
-        # Check the variable type
-        if isinstance(value, bool):
-            value = "1" if value else "0"
-        elif not isinstance(value, str):
-            value = str(value)
-
-        # Replace %AppDir% with the directory of the INI file
-        if "%AppDir%" in value:
-            value = value.replace("%AppDir%", self.script_directory)
-
-        # Replace %TotalRAM% with the total RAM in bytes
-        if "%TotalRAM%" in value:
-            value = str(value).replace("%TotalRAM%", str(psutil.virtual_memory().total))
-
-        # Remove Quotes and Double Quotes
-        value = value.replace('"', "").replace("'", "")
-
-        # Remove leading and trailing whitespace
-        value = value.strip()
-
-        # Debugging
-        if DEBUG:
-            print(f"Value parsed: [{value}]")
-
-        return value
-
-    def convert_to_string(self, array):
-
-        # loop through the array and convert each item to a string
-        for i in range(len(array)):
-            array[i] = str(array[i])
-
-        return array
-
-    def convert_to_bytes(self, size):
-
-        # Debugging
-        if DEBUG:
-            print(f"Parsing size [{size}]...")
-
-        # Check if the size is a string
-        if isinstance(size, str):
-
-            # Check if the size ends with a unit
-            if size[-1].isalpha():
-
-                # Get the unit and value
-                unit = size[-1].lower()
-                value = int(size[:-1])
-
-                # Convert the value to bytes
-                if unit == "t":
-                    return value * 1024**4
-                elif unit == "g":
-                    return value * 1024**3
-                elif unit == "m":
-                    return value * 1024**2
-                elif unit == "k":
-                    return value * 1024
-                elif unit == "b":
-                    return value
-
-        return int(size)
-
-    def convert_to_human_readable(self, size):
-
-        # Debugging
-        if DEBUG:
-            print(f"Parsing size [{size}]...")
-
-        # Convert the size to a human-readable format
-        if size >= 1024**4:
-            return f"{size / 1024**4:.2f} TB"
-        elif size >= 1024**3:
-            return f"{size / 1024**3:.2f} GB"
-        elif size >= 1024**2:
-            return f"{size / 1024**2:.2f} MB"
-        elif size >= 1024:
-            return f"{size / 1024:.2f} KB"
-
-        return f"{size} B"
-
-    def convert_to_ini(self, size):
-
-        # Debugging
-        if DEBUG:
-            print(f"Parsing size [{size}]...")
-
-        # Convert the size to a human-readable format and remove decimals
-        if size >= 1024**4:
-            return f"{size // 1024**4}T"
-        elif size >= 1024**3:
-            return f"{size // 1024**3}G"
-        elif size >= 1024**2:
-            return f"{size // 1024**2}M"
-        elif size >= 1024:
-            return f"{size // 1024}B"
-
-        return f"{size}B"
-
-    def get_array_key(self, array, key):
-        if isinstance(array, list):
-            for item in array:
-                if isinstance(item, dict) and key in item:
-                    return item[key]
-        return None
-
     def add_input(self, layout, section, key, parameters):
 
         # Debugging
-        if DEBUG:
-            print(f"Initializing Input[{section} -> {key}]...")
+        self.log(f"Initializing Input[{section} -> {key}]...")
 
         # Get the value from the configuration
         value = self.parse_variables(self.config[section].get(key, parameters["default"]))
@@ -564,8 +624,7 @@ class Configurator(QMainWindow):
             value = int(value)
 
             # Debugging
-            if DEBUG:
-                print(f"Min: {min_value}, Max: {max_value}, Value: {value}")
+            self.log(f"Min: {min_value}, Max: {max_value}, Value: {value}")
 
             # Create a slider for the range
             slider = QSlider(Qt.Horizontal)
@@ -604,8 +663,7 @@ class Configurator(QMainWindow):
             value = self.convert_to_bytes(value)
 
             # Debugging
-            if DEBUG:
-                print(f"Min: {min_value}, Max: {max_value}, Value: {value}")
+            self.log(f"Min: {min_value}, Max: {max_value}, Value: {value}")
 
             # Scale the values for the slider
             min_scaled = min_value // scale
@@ -642,13 +700,13 @@ class Configurator(QMainWindow):
             path_layout.setContentsMargins(0, 0, 0, 0)
             line_edit = QLineEdit()
             line_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            line_edit.setText(value)
+            line_edit.setText(os.path.abspath(value))
             browse_button = QPushButton("...")
             default_button = QPushButton("Set Default")
 
             # Connect buttons
             browse_button.clicked.connect(lambda: self.browse_path(line_edit))
-            default_button.clicked.connect(lambda: line_edit.setText(self.parse_variables(default_path)))
+            default_button.clicked.connect(lambda: line_edit.setText(os.path.abspath(self.parse_variables(default_path))))
 
             # Add widgets to the path layout
             path_layout.addWidget(line_edit)
@@ -685,108 +743,124 @@ class Configurator(QMainWindow):
                 input.setObjectName("fieldCheckbox")
 
             # Debugging
-            if DEBUG:
-                print(f"Object Name: {input.objectName()}")
+            self.log(f"Object Name: {input.objectName()}")
 
             # Add the input field to the layout
             label_layout.addWidget(input)
 
-            # Store the field in the objects dictionary
-            self.objects[section][key] = input
+            # Store the field in the objs dictionary
+            self.objs[section][key] = input
             if parameters["type"] in ["filesize","range"]:
-                self.objects[section][key] = slider
+                self.objs[section][key] = slider
             elif parameters["type"] == "path":
-                self.objects[section][key] = line_edit
+                self.objs[section][key] = line_edit
 
         # Debugging
-        if DEBUG:
-            print(f"Input[{section} -> {key}] initialized.")
+        self.log(f"Input[{section} -> {key}] initialized.")
 
-    def browse_path(self, line_edit):
-        path = QFileDialog.getExistingDirectory(self, "Select Directory", self.script_directory)
-        if path:
-            line_edit.setText(path)
+    ############################################################################
+    #
+    # Core Methods
+    #
+    ############################################################################
+
+    def log(self, *message):
+        if DEBUG:
+            print(*message)
+            with open(os.path.abspath(os.path.join(self.script_directory, LOG_FILE)), "a") as f:
+                print(*message, file=f)
 
     def save_config(self):
-        for section, fields in self.fields.items():
-            for key, parameters in fields.items():
 
-                # Skip if the field is not in the objects dictionary
-                if key not in self.objects[section]:
-                    if key in self.config[section]:
-                        self.config[section].pop(key)
-                    continue
+        try:
 
-                # Get the object
-                object = self.objects[section][key]
-
-                # Process value based on field type
-                if parameters["type"] == "filesize":
-                    value = self.convert_to_ini(object.value() * 1024)
-                elif parameters["type"] == "range":
-                    value = str(object.value())
-                elif parameters["type"] == "multi-select":
-                    selected_items = object.selectedItems()
-                    selected_values = [item.text() for item in selected_items]
-                    value = ",".join(selected_values)
-                elif parameters["type"] == "select":
-                    value = object.currentText()
-                elif parameters["type"] == "text":
-                    value = object.text()
-                elif parameters["type"] == "static":
-                    value = None
-                elif parameters["type"] == "number":
-                    value = str(object.value())
-                elif parameters["type"] == "checkbox":
-                    value = "True" if object.isChecked() else "False"
-                elif parameters["type"] == "raw":
-                    if object.isChecked():
-                        value = str(parameters["default"])
-                    else:
-                        value = None
-                else:
-                    value = object.text()
-
-                # Debugging
-                if DEBUG:
-                    print(f"Attempting: {section} -> {key} = {value}")
-
-                # Add quotes to the value if it contains spaces
-                if value is not None and " " in value:
-                    value = f'"{value}"'
-
-                # Convert default to string
-                if not isinstance(parameters["default"], str):
-                    parameters["default"] = str(parameters["default"])
-
-                # Save the value to the config
-                self.config[section][key] = value
-
-                # Unset the confguration value if it is the same as default and no required
-                if value is None or (parameters["type"] != "raw" and value.lower() == parameters["default"].lower() and not parameters["required"]):
-                    self.config[section].pop(key)
-                else:
-                    # Debugging
-                    if DEBUG:
-                        print(f"Saving: {section} -> {key} = {value}")
-
-        # Write the updated configuration back to the file
-        with open(self.ini_path, "w") as configfile:
+            # Retrieve the configuration from the form
             for section, fields in self.fields.items():
-                configfile.write(f"[{section}]\n")
                 for key, parameters in fields.items():
-                    value = self.config[section].get(key)
-                    if parameters["type"] == "raw":
-                        if value:
-                            configfile.write(f"{value}\n")
-                    elif value:
-                        configfile.write(f"{key} = {value}\n")
-                configfile.write("\n")
 
-        QMessageBox.information(self, "Saved", "Configurations saved successfully.")
+                    # Skip if the field is not in the objs dictionary
+                    if key not in self.objs[section]:
+                        if key in self.config[section]:
+                            self.config[section].pop(key)
+                        continue
+
+                    # Get the object
+                    obj = self.objs[section][key]
+
+                    # Process value based on field type
+                    if parameters["type"] == "filesize":
+                        value = self.convert_to_ini(obj.value() * 1024)
+                    elif parameters["type"] == "range":
+                        value = str(obj.value())
+                    elif parameters["type"] == "multi-select":
+                        selected_items = obj.selectedItems()
+                        selected_values = [item.text() for item in selected_items]
+                        value = ",".join(selected_values)
+                    elif parameters["type"] == "select":
+                        value = obj.currentText()
+                    elif parameters["type"] == "text":
+                        value = obj.text()
+                    elif parameters["type"] == "static":
+                        value = None
+                    elif parameters["type"] == "number":
+                        value = str(obj.value())
+                    elif parameters["type"] == "checkbox":
+                        value = "True" if obj.isChecked() else "False"
+                    elif parameters["type"] == "raw":
+                        if obj.isChecked():
+                            value = str(parameters["default"])
+                        else:
+                            value = None
+                    else:
+                        value = obj.text()
+
+                    # Debugging
+                    self.log(f"Attempting: {section} -> {key} = {value}")
+
+                    # Add quotes to the value if it contains spaces
+                    if value is not None and " " in value:
+                        value = f'"{value}"'
+
+                    # Convert default to string
+                    if not isinstance(parameters["default"], str):
+                        parameters["default"] = str(parameters["default"])
+
+                    # Save the value to the config
+                    self.config[section][key] = value
+
+                    # Unset the confguration value if it is the same as default and no required
+                    if value is None or (parameters["type"] != "raw" and value.lower() == parameters["default"].lower() and not parameters["required"]):
+                        self.config[section].pop(key)
+                    else:
+                        # Debugging
+                        self.log(f"Saving: {section} -> {key} = {value}")
+
+            # Write the updated configuration back to the file
+            with open(self.ini_path, "w", encoding=self.encoding) as configfile:
+                for section, fields in self.fields.items():
+                    configfile.write(f"[{section}]\n")
+                    for key, parameters in fields.items():
+                        value = self.config[section].get(key)
+                        if parameters["type"] == "raw":
+                            if value:
+                                configfile.write(f"{value}\n")
+                        elif value:
+                            configfile.write(f"{key} = {value}\n")
+                    configfile.write("\n")
+
+            QMessageBox.information(self, "Saved", "Configurations saved successfully.")
+        except Exception as e:
+            self.log("Error saving configuration:", str(e))
+            QMessageBox.critical(self, "Error", f"Failed to save configurations:\n{e}")
+
+############################################################################
+#
+# Entry Point
+#
+############################################################################
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = Configurator(INI_FILE, APP_NAME)
+    window = Configurator(INI_FILE)
     window.show()
     sys.exit(app.exec_())

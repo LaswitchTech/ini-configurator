@@ -377,7 +377,7 @@ class Configurator(QMainWindow):
 
         # Replace %AppDir% with the directory of the INI file
         if "%AppDir%" in value:
-            value = value.replace("%AppDir%", os.path.dirname(self.ini_path))
+            value = value.replace("%AppDir%", self.script_directory)
 
         # Replace %TotalRAM% with the total RAM in bytes
         if "%TotalRAM%" in value:
